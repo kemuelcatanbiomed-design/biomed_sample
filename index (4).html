@@ -1,0 +1,1982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emergency Unit OPD Logsheet - Precision Multi-Column Filter Portal</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- SheetJS (xlsx.full.min.js) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            med: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+              800: '#115e59',
+              900: '#134e4a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .table-container {
+      max-height: calc(100vh - 430px);
+      min-height: 420px;
+    }
+    .sticky-col-first {
+      position: sticky;
+      left: 0;
+      z-index: 20;
+    }
+    .sticky-col-second {
+      position: sticky;
+      left: 65px;
+      z-index: 20;
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-area, #print-area * {
+        visibility: visible;
+      }
+      #print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Top App Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Left: Branding & Status -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-med-600 to-cyan-600 flex items-center justify-center text-white shadow-md shadow-med-600/20">
+            <i data-lucide="shield-check" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-none">Emergency OPD Log Portal</h1>
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                Zero Data Loss Mode
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium mt-0.5 truncate max-w-xs sm:max-w-md" id="dataset-title">No file loaded</p>
+          </div>
+        </div>
+
+        <!-- Right: Actions & Tools -->
+        <div class="flex items-center space-x-2">
+          <button id="btn-load-demo" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-med-50 text-med-700 hover:bg-med-100 border border-med-200 transition-colors shadow-2xs">
+            <i data-lucide="database" class="w-3.5 h-3.5 text-med-600"></i>
+            <span>Load Demo Log</span>
+          </button>
+          
+          <label for="excel-file-input" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 cursor-pointer transition-colors shadow-2xs">
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+            <span>Upload Logsheet</span>
+          </label>
+          <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="hidden" />
+
+          <button id="btn-export-excel" disabled class="disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">Export Excel</span>
+          </button>
+
+          <button id="btn-export-csv" disabled class="disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-white hover:bg-slate-800 transition-colors shadow-2xs">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">CSV</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 flex flex-col gap-3">
+
+    <!-- Upload & Drop Zone (Shown when empty) -->
+    <div id="upload-zone" class="border-2 border-dashed border-slate-300 hover:border-med-500 bg-white hover:bg-med-50/20 rounded-2xl p-8 sm:p-12 text-center transition-all cursor-pointer shadow-xs">
+      <div class="flex flex-col items-center justify-center max-w-lg mx-auto">
+        <div class="w-16 h-16 rounded-2xl bg-med-100 text-med-600 flex items-center justify-center mb-4 shadow-inner">
+          <i data-lucide="file-spreadsheet" class="w-9 h-9"></i>
+        </div>
+        <h3 class="text-lg font-bold text-slate-900">Upload Hospital Emergency OPD Logsheet</h3>
+        <p class="text-xs text-slate-500 mt-2 mb-5 leading-relaxed">
+          Optimized for <span class="font-semibold text-slate-800">EMERGENCY UNIT LOGSHEET- OPD CONSULTATIONS FINAL.xlsx</span>. 
+          Auto-bypasses merged banner rows (Row 1), preserves Excel date serials, prevents missing data through normalized text matching, and supports all 39 hospital columns.
+        </p>
+        <div class="flex flex-wrap gap-2.5 justify-center">
+          <button type="button" onclick="document.getElementById('excel-file-input').click()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-med-600 text-white hover:bg-med-700 shadow-md shadow-med-600/20 transition-all">
+            <i data-lucide="folder-open" class="w-4 h-4"></i> Browse Excel File
+          </button>
+          <button type="button" onclick="loadSampleData()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-all">
+            <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i> Load Demo Dataset (39 Columns)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Dashboard Workspace -->
+    <div id="dashboard-section" class="hidden flex-col gap-3">
+
+      <!-- KPI Summary Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+        
+        <!-- Total vs Filtered -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div class="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Records Filtered</div>
+          <div class="flex items-baseline gap-1 mt-1">
+            <span id="kpi-filtered" class="text-xl font-extrabold text-slate-900">0</span>
+            <span class="text-xs text-slate-400">/ <span id="kpi-total">0</span></span>
+          </div>
+          <div id="kpi-match-percent" class="text-[10px] text-med-600 font-semibold mt-0.5">100% matched</div>
+        </div>
+
+        <!-- Top Attending Physician -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div class="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Top Attending MD</div>
+          <div id="kpi-top-doctor" class="text-xs font-bold text-slate-900 truncate mt-1">--</div>
+          <div id="kpi-doctor-count" class="text-[10px] text-slate-500">0 consults</div>
+        </div>
+
+        <!-- Top Diagnosis -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div class="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Top Diagnosis</div>
+          <div id="kpi-top-dx" class="text-xs font-bold text-slate-900 truncate mt-1">--</div>
+          <div id="kpi-top-dx-count" class="text-[10px] text-slate-500">0 cases</div>
+        </div>
+
+        <!-- Average Turnaround Time -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div class="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Avg Turnaround</div>
+          <div id="kpi-avg-turnaround" class="text-xl font-extrabold text-slate-900 mt-1">--</div>
+          <div class="text-[10px] text-slate-400">Arrival to Discharged</div>
+        </div>
+
+        <!-- Disposition Ratio -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div class="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Admitted vs Treated</div>
+          <div class="flex items-baseline gap-1 mt-1 text-xs font-bold text-slate-800">
+            <span id="kpi-admit-count" class="text-rose-600">0 Adm</span>
+            <span>:</span>
+            <span id="kpi-discharged-count" class="text-emerald-600">0 Disch</span>
+          </div>
+          <div id="kpi-admit-percent" class="text-[10px] text-slate-500">0% Admission Rate</div>
+        </div>
+
+        <!-- Demographics Ratio -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div class="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Sex & Age Demographics</div>
+          <div class="flex items-baseline gap-1 mt-1 text-xs font-bold text-slate-800">
+            <span id="kpi-male-count" class="text-sky-600">0 M</span>
+            <span>/</span>
+            <span id="kpi-female-count" class="text-rose-500">0 F</span>
+          </div>
+          <div id="kpi-avg-age" class="text-[10px] text-slate-500">Avg Age: -- y/o</div>
+        </div>
+
+      </div>
+
+      <!-- Precision Filter Controls Panel -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-2xs flex flex-col gap-3">
+        
+        <!-- Universal Search & Presets Toolbar -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+          
+          <!-- Universal Normalized Search Input -->
+          <div class="relative flex-1 max-w-xl">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input type="text" id="global-search" placeholder="Search across all 39 columns (case-insensitive, trims extra spaces)..." 
+                   class="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-med-500 rounded-xl outline-hidden focus:ring-2 focus:ring-med-500/20 transition-all">
+            <button id="clear-search-btn" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <!-- Column Views & Presets -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[11px] font-semibold text-slate-500 mr-1">Views:</span>
+            <button onclick="applyColumnPreset('clinical')" class="preset-btn px-2.5 py-1 text-xs font-medium rounded-lg bg-med-50 text-med-800 border border-med-200 hover:bg-med-100 transition">Clinical</button>
+            <button onclick="applyColumnPreset('timings')" class="preset-btn px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">Timings & Audit</button>
+            <button onclick="applyColumnPreset('demographics')" class="preset-btn px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">Demographics</button>
+            <button onclick="applyColumnPreset('billing')" class="preset-btn px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">Procedures & Rx</button>
+            <button onclick="applyColumnPreset('all')" class="preset-btn px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">All 39 Columns</button>
+            
+            <button id="btn-toggle-columns" class="ml-1 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
+              <i data-lucide="columns-3" class="w-3.5 h-3.5"></i> Columns (<span id="visible-col-count">0</span>)
+            </button>
+            
+            <button id="btn-reset-filters" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg text-rose-600 hover:bg-rose-50 border border-transparent transition">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset All Filters
+            </button>
+          </div>
+
+        </div>
+
+        <!-- High-Speed Dropdown Slicers -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+          
+          <!-- Slicer: Doctor -->
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Doctor / Physician</label>
+            <select id="slicer-doctor" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-lg px-2 py-1.5 outline-hidden focus:border-med-500 focus:bg-white text-xs">
+              <option value="">All Doctors (Any)</option>
+            </select>
+          </div>
+
+          <!-- Slicer: Disposition -->
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Disposition</label>
+            <select id="slicer-disposition" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-lg px-2 py-1.5 outline-hidden focus:border-med-500 focus:bg-white text-xs">
+              <option value="">All Dispositions</option>
+            </select>
+          </div>
+
+          <!-- Slicer: Triage Level -->
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Triage Scale</label>
+            <select id="slicer-triage" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-lg px-2 py-1.5 outline-hidden focus:border-med-500 focus:bg-white text-xs">
+              <option value="">All Triage Scales</option>
+            </select>
+          </div>
+
+          <!-- Slicer: Age Category -->
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Age Demographic</label>
+            <select id="slicer-age-bracket" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-lg px-2 py-1.5 outline-hidden focus:border-med-500 focus:bg-white text-xs">
+              <option value="">All Ages</option>
+              <option value="pediatric">Pediatric (0 - 18 yrs)</option>
+              <option value="adult">Adult (19 - 59 yrs)</option>
+              <option value="geriatric">Geriatric (60+ yrs)</option>
+            </select>
+          </div>
+
+          <!-- Slicer: Sex -->
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Sex</label>
+            <select id="slicer-sex" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-lg px-2 py-1.5 outline-hidden focus:border-med-500 focus:bg-white text-xs">
+              <option value="">All (M & F)</option>
+              <option value="M">Male (M)</option>
+              <option value="F">Female (F)</option>
+            </select>
+          </div>
+
+          <!-- Slicer: Condition on Discharge -->
+          <div>
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Discharge Condition</label>
+            <select id="slicer-condition" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-lg px-2 py-1.5 outline-hidden focus:border-med-500 focus:bg-white text-xs">
+              <option value="">All Conditions</option>
+            </select>
+          </div>
+
+        </div>
+
+        <!-- Active Filter Badges & Header Row Fallback Strip -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+          <div class="flex items-center gap-1.5 flex-wrap" id="active-filter-chips">
+            <span class="text-[11px] text-slate-400 font-medium">Active Filters:</span>
+            <span id="no-active-filters-label" class="text-[11px] text-slate-400 italic">None (Displaying unfiltered data)</span>
+          </div>
+
+          <div class="flex items-center gap-2 text-[11px] text-slate-500">
+            <span>Header Row:</span>
+            <select id="header-row-override" onchange="overrideHeaderRow(this.value)" class="bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 font-semibold text-slate-700">
+              <option value="1">Row 1 (Banner)</option>
+              <option value="2" selected>Row 2 (39 Columns - Standard)</option>
+              <option value="3">Row 3</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Main Logsheet Data Table -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col">
+        
+        <!-- Table Pagination & Row Status Header -->
+        <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-slate-900" id="table-record-counter">0 records</span>
+            <span id="table-sub-counter" class="text-slate-400 font-normal"></span>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1.5">
+              <span>Per page:</span>
+              <select id="page-size-selector" onchange="changePageSize(this.value)" class="bg-white border border-slate-200 rounded-md px-2 py-1 font-medium text-slate-700">
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="500">500</option>
+                <option value="-1">All Rows (No Pagination)</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <button id="btn-page-prev" onclick="goToPage(currentPage - 1)" class="p-1 rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+              </button>
+              <span id="page-label" class="px-2 font-medium text-slate-800">Page 1 of 1</span>
+              <button id="btn-page-next" onclick="goToPage(currentPage + 1)" class="p-1 rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scrollable Table View with Sticky Headers and Per-Column Inline Filters -->
+        <div class="overflow-x-auto table-container">
+          <table class="w-full text-left border-collapse text-xs" id="er-main-table">
+            <thead class="sticky top-0 bg-slate-100 z-30 shadow-xs">
+              
+              <!-- Row 1 of Header: Column Names & Sorters -->
+              <tr id="table-headers-tr" class="border-b border-slate-200">
+                <!-- Injected via JavaScript -->
+              </tr>
+
+              <!-- Row 2 of Header: Direct Inline Column Filters -->
+              <tr id="table-filter-inputs-tr" class="border-b border-slate-200 bg-slate-50/90 text-slate-700">
+                <!-- Injected via JavaScript (Individual inputs per column) -->
+              </tr>
+
+            </thead>
+            
+            <tbody id="table-body" class="divide-y divide-slate-100 font-normal">
+              <!-- Dynamically populated table rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- No Records Found Alert -->
+        <div id="no-records-view" class="hidden p-12 text-center">
+          <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-2">
+            <i data-lucide="filter-x" class="w-6 h-6"></i>
+          </div>
+          <h4 class="text-sm font-bold text-slate-800">Zero Matching Hospital Records</h4>
+          <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            No rows match your combined universal search and column filter criteria. Clear filters or check for spelling.
+          </p>
+          <button onclick="resetAllFilters()" class="mt-3 px-3.5 py-1.5 text-xs font-semibold bg-med-600 text-white rounded-lg hover:bg-med-700 transition">
+            Clear All Active Filters
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+
+  <!-- Full Patient Chart / Record Detail Drawer Modal -->
+  <div id="patient-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-med-600 text-white flex items-center justify-center font-bold text-base shadow-sm">
+            <span id="modal-patient-avatar">ER</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="modal-patient-name" class="text-base font-bold text-slate-900">Patient Full Name</h3>
+              <span id="modal-sex-age-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800">M • 0 y/o</span>
+              <span id="modal-triage-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Triage: --</span>
+            </div>
+            <p id="modal-hosp-no" class="text-xs text-slate-500 font-mono mt-0.5">Hospital No: --</p>
+          </div>
+        </div>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Organized into 5 Clinical Categories) -->
+      <div class="p-6 overflow-y-auto space-y-5 text-xs">
+
+        <!-- Category 1: Clinical Assessment & Physician -->
+        <div>
+          <h4 class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i data-lucide="stethoscope" class="w-3.5 h-3.5"></i> Clinical Diagnosis & Medical Staff
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-emerald-50/40 p-3 rounded-xl border border-emerald-100">
+            <div>
+              <span class="text-slate-500 block text-[10px] font-semibold">Chief Complaint:</span>
+              <div id="modal-complaint" class="text-slate-900 font-medium mt-0.5 text-xs">--</div>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px] font-semibold">Final / Clinical Diagnosis:</span>
+              <div id="modal-diagnosis" class="text-slate-900 font-bold mt-0.5 text-xs">--</div>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px] font-semibold">Attending Physician (Doctor / ROD):</span>
+              <div id="modal-doctor" class="text-slate-900 font-semibold mt-0.5">--</div>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px] font-semibold">Procedures Done:</span>
+              <div id="modal-procedures" class="text-slate-900 font-medium mt-0.5">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category 2: Turnaround Timestamps & Flow Audit -->
+        <div>
+          <h4 class="text-[11px] font-bold text-sky-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i> Flow Timestamps & Time Lapsed Audit
+          </h4>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-sky-50/50 p-3 rounded-xl border border-sky-100">
+            <div>
+              <span class="text-slate-500 block text-[10px]">Date of Arrival:</span>
+              <strong id="modal-date-arrival" class="text-slate-900">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Time of Arrival:</span>
+              <strong id="modal-time-arrival" class="text-slate-900">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Time Seen/Assessed ER:</span>
+              <strong id="modal-time-seen-er" class="text-slate-900">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Time Informed ROD:</span>
+              <strong id="modal-time-informed-rod" class="text-slate-900">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Time Seen by ROD:</span>
+              <strong id="modal-time-seen-rod" class="text-slate-900">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Date of Discharge:</span>
+              <strong id="modal-date-discharge" class="text-slate-900">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Time Discharge:</span>
+              <strong id="modal-time-discharge" class="text-slate-900">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Time Discharged by Nurse:</span>
+              <strong id="modal-time-discharge-nurse" class="text-slate-900">--</strong>
+            </div>
+          </div>
+          
+          <!-- Turnaround Indicators -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            <div>
+              <span class="text-slate-500 block text-[10px]">NOD Assessment Time:</span>
+              <span id="modal-lapse-nod" class="font-bold text-slate-800 font-mono-code">--</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">ROD Response Time:</span>
+              <span id="modal-lapse-rod" class="font-bold text-slate-800 font-mono-code">--</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Total NOD Time Lapse:</span>
+              <span id="modal-lapse-total-nod" class="font-bold text-slate-800 font-mono-code">--</span>
+            </div>
+            <div class="bg-med-50 p-1.5 rounded-lg border border-med-200">
+              <span class="text-med-800 block text-[10px] font-bold">Total Arrival to Discharged:</span>
+              <span id="modal-lapse-arrival-discharge" class="font-bold text-med-900 font-mono-code text-sm">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category 3: Patient Demographics & Address -->
+        <div>
+          <h4 class="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i data-lucide="user" class="w-3.5 h-3.5"></i> Patient Identification & Demographics
+          </h4>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div>
+              <span class="text-slate-500 block text-[10px]">Last Name:</span>
+              <strong id="modal-last-name" class="text-slate-900">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">First Name:</span>
+              <strong id="modal-first-name" class="text-slate-900">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Middle Initial:</span>
+              <strong id="modal-mi" class="text-slate-900">--</strong>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Birthday:</span>
+              <span id="modal-birthday" class="text-slate-900">--</span>
+            </div>
+            <div class="col-span-2 sm:col-span-4">
+              <span class="text-slate-500 block text-[10px]">Complete Residential Address:</span>
+              <span id="modal-address" class="text-slate-800 font-medium">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category 4: Disposition, Nursing Charges & Medico-Legal -->
+        <div>
+          <h4 class="text-[11px] font-bold text-purple-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i> Disposition, Charges & Administrative Data
+          </h4>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-purple-50/40 p-3 rounded-xl border border-purple-100">
+            <div>
+              <span class="text-slate-500 block text-[10px]">Disposition:</span>
+              <span id="modal-disposition" class="font-bold text-slate-900">--</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Condition on Discharge:</span>
+              <span id="modal-condition" class="font-bold text-slate-900">--</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Refused Admission Reason:</span>
+              <span id="modal-refused-reason" class="text-slate-800 italic">--</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Medico-Legal:</span>
+              <span id="modal-medico-legal" class="font-semibold text-slate-900">--</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">Minor OR:</span>
+              <span id="modal-minor-or" class="text-slate-900">--</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block text-[10px]">With Rx:</span>
+              <span id="modal-with-rx" class="text-slate-900">--</span>
+            </div>
+            <div class="col-span-2">
+              <span class="text-slate-500 block text-[10px]">ER Nursing Procedure Charges (Misc):</span>
+              <span id="modal-charges" class="text-slate-900 font-mono-code font-bold">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Complete 39 Fields Raw Audit Explorer -->
+        <div class="pt-2">
+          <button type="button" onclick="toggleRawModalData()" class="text-xs text-slate-500 hover:text-slate-800 underline font-semibold flex items-center gap-1">
+            <i data-lucide="code" class="w-3.5 h-3.5"></i>
+            <span>View All 39 Raw Field Values for This Row</span>
+          </button>
+          <div id="modal-raw-json-box" class="hidden mt-2 p-3 bg-slate-950 text-slate-200 rounded-xl font-mono-code text-[10px] max-h-48 overflow-y-auto leading-relaxed">
+            <!-- Raw key-value list injected here -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center">
+        <span class="text-[11px] text-slate-400">Press Esc or click Close to return</span>
+        <button onclick="closeModal()" class="px-4 py-1.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-semibold text-xs transition">
+          Close Chart
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Column Visibility Drawer -->
+  <div id="columns-drawer" class="fixed inset-y-0 right-0 z-50 w-84 bg-white shadow-2xl border-l border-slate-200 p-5 transform translate-x-full transition-transform duration-200 ease-in-out flex flex-col">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <i data-lucide="sliders" class="w-4 h-4 text-med-600"></i>
+        <h3 class="text-sm font-bold text-slate-900">Visible Columns Manager</h3>
+      </div>
+      <button onclick="toggleColumnsDrawer(false)" class="text-slate-400 hover:text-slate-700 p-1">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <div class="flex items-center justify-between py-2 border-b border-slate-100 text-xs">
+      <button onclick="selectAllColumns(true)" class="text-med-600 hover:underline font-semibold">Select All (39)</button>
+      <button onclick="selectAllColumns(false)" class="text-rose-600 hover:underline font-semibold">Clear to Default (7)</button>
+    </div>
+
+    <!-- Search box inside column drawer -->
+    <div class="py-2">
+      <input type="text" id="column-search-input" oninput="filterColumnDrawerList(this.value)" placeholder="Search column names..." 
+             class="w-full text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg outline-hidden focus:border-med-500">
+    </div>
+
+    <div id="columns-checkbox-list" class="flex-1 overflow-y-auto py-2 space-y-1.5 text-xs">
+      <!-- Checkboxes injected dynamically -->
+    </div>
+
+    <div class="pt-3 border-t border-slate-100">
+      <button onclick="toggleColumnsDrawer(false)" class="w-full py-2 bg-med-600 text-white rounded-xl font-semibold text-xs hover:bg-med-700">
+        Apply & Close
+      </button>
+    </div>
+  </div>
+
+  <!-- Hidden Container for Printing Filtered Reports -->
+  <div id="print-area" class="hidden"></div>
+
+
+  <script>
+    // Canonical 39 Columns matching 'EMERGENCY UNIT LOGSHEET- OPD CONSULTATIONS FINAL.xlsx'
+    const CANONICAL_39_COLUMNS = [
+      "NO.",
+      "DATE OF ARRIVAL",
+      "TIME OF ARRIVAL",
+      "TIME SEEN & ASSESTED BY ER",
+      "TIME INFORMED ROD",
+      "TIME PATIENT IS SEEN BY ROD",
+      "DATE OF DISCHARGE",
+      "TIME DISCHARGE",
+      "TIME DISCHARGE BY NURSE",
+      "TIME LAPSED (NOD ASSESSMENT)",
+      "TIME LAPSE (ROD)",
+      "TIME LAPSE (ROD) 2",
+      "TOTAL NOD TIME LAPSE",
+      "TIME LAPSED (ARRIVAL TO DISCHARGED)",
+      "HOSPITAL NO.",
+      "LAST NAME",
+      "FIRST NAME",
+      "M.I.",
+      "AGE",
+      "SEX",
+      "BIRTHDAY",
+      "ADDRESS",
+      "CHIEF COMPLAIN",
+      "DIAGNOSIS",
+      "DOCTOR",
+      "PROCEDURES DONE",
+      "TRIAGE SCALE - I",
+      "TRIAGE SCALE - II",
+      "TRIAGE SCALE - III",
+      "DISPOSITION",
+      "REFUSED ADMISSION REASON",
+      "MINOR OR",
+      "MEDICO LEGAL",
+      "ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)",
+      "WITH RX",
+      "NEW",
+      "DISPOSITION 2",
+      "NEW 2",
+      "CONDITION ON DISCHARGE"
+    ];
+
+    // High Impact Presets
+    const PRESETS = {
+      clinical: [
+        "NO.", "DATE OF ARRIVAL", "TIME OF ARRIVAL", "LAST NAME", "FIRST NAME", 
+        "AGE", "SEX", "CHIEF COMPLAIN", "DIAGNOSIS", "DOCTOR", "DISPOSITION", "CONDITION ON DISCHARGE"
+      ],
+      timings: [
+        "NO.", "LAST NAME", "FIRST NAME", "DATE OF ARRIVAL", "TIME OF ARRIVAL", 
+        "TIME SEEN & ASSESTED BY ER", "TIME INFORMED ROD", "TIME PATIENT IS SEEN BY ROD",
+        "DATE OF DISCHARGE", "TIME DISCHARGE", "TOTAL NOD TIME LAPSE", "TIME LAPSED (ARRIVAL TO DISCHARGED)", "DOCTOR"
+      ],
+      demographics: [
+        "NO.", "HOSPITAL NO.", "LAST NAME", "FIRST NAME", "M.I.", "AGE", "SEX", 
+        "BIRTHDAY", "ADDRESS", "DIAGNOSIS", "DOCTOR"
+      ],
+      billing: [
+        "NO.", "HOSPITAL NO.", "LAST NAME", "FIRST NAME", "PROCEDURES DONE", 
+        "MINOR OR", "MEDICO LEGAL", "ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)", "WITH RX", "DISPOSITION"
+      ],
+      all: [] // All 39 columns
+    };
+
+    // State Variables
+    let rawWorkbook = null;
+    let allRecords = [];           // Full dataset (guaranteed zero omission)
+    let detectedHeaders = [];      // Column header strings
+    let visibleColumns = [];       // Columns currently displayed
+    let filteredRecords = [];      // Records passing all criteria
+    let headerRowIndex = 1;        // 0-indexed; 1 = Excel Row 2
+    let currentPage = 1;
+    let pageSize = 25;
+    let sortColumn = null;
+    let sortDirection = 'asc';
+
+    // Active column specific filter values: { [columnKey]: string }
+    let columnFilters = {};
+
+    // Slicer filters:
+    let slicerDoctor = '';
+    let slicerDisposition = '';
+    let slicerTriage = '';
+    let slicerAgeBracket = '';
+    let slicerSex = '';
+    let slicerCondition = '';
+
+    // Universal search query
+    let globalQuery = '';
+
+    // Sample dataset based on Philippine Eastern Visayas Medical Center / Palo ER patterns
+    const SAMPLE_RECORDS = [
+      {
+        "NO.": "1", "DATE OF ARRIVAL": "2026-09-01", "TIME OF ARRIVAL": "07:15", "TIME SEEN & ASSESTED BY ER": "07:20",
+        "TIME INFORMED ROD": "07:22", "TIME PATIENT IS SEEN BY ROD": "07:30", "DATE OF DISCHARGE": "2026-09-01", "TIME DISCHARGE": "11:45",
+        "TIME DISCHARGE BY NURSE": "11:50", "TIME LAPSED (NOD ASSESSMENT)": "5 mins", "TIME LAPSE (ROD)": "8 mins", "TIME LAPSE (ROD) 2": "",
+        "TOTAL NOD TIME LAPSE": "13 mins", "TIME LAPSED (ARRIVAL TO DISCHARGED)": "270 mins", "HOSPITAL NO.": "ER-26-00901",
+        "LAST NAME": "KANONGKONG", "FIRST NAME": "MARIO", "M.I.": "P", "AGE": "54", "SEX": "M", "BIRTHDAY": "1972-03-14",
+        "ADDRESS": "Brgy. Pawing, Palo, Leyte", "CHIEF COMPLAIN": "Sudden onset severe chest tightness and sweating",
+        "DIAGNOSIS": "Acute Coronary Syndrome; NSTEMI", "DOCTOR": "DR. GONGORA", "PROCEDURES DONE": "ECG, IV line insertion, Trop-I",
+        "TRIAGE SCALE - I": "Level 1 - Resuscitation", "TRIAGE SCALE - II": "", "TRIAGE SCALE - III": "",
+        "DISPOSITION": "ADMITTED", "REFUSED ADMISSION REASON": "", "MINOR OR": "NO", "MEDICO LEGAL": "NO",
+        "ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)": "850.00", "WITH RX": "YES", "NEW": "YES", "DISPOSITION 2": "CCU", "NEW 2": "", "CONDITION ON DISCHARGE": "STABLE"
+      },
+      {
+        "NO.": "2", "DATE OF ARRIVAL": "2026-09-01", "TIME OF ARRIVAL": "08:10", "TIME SEEN & ASSESTED BY ER": "08:18",
+        "TIME INFORMED ROD": "08:20", "TIME PATIENT IS SEEN BY ROD": "08:25", "DATE OF DISCHARGE": "2026-09-01", "TIME DISCHARGE": "10:30",
+        "TIME DISCHARGE BY NURSE": "10:35", "TIME LAPSED (NOD ASSESSMENT)": "8 mins", "TIME LAPSE (ROD)": "5 mins", "TIME LAPSE (ROD) 2": "",
+        "TOTAL NOD TIME LAPSE": "13 mins", "TIME LAPSED (ARRIVAL TO DISCHARGED)": "140 mins", "HOSPITAL NO.": "ER-26-00902",
+        "LAST NAME": "DELA CRUZ", "FIRST NAME": "ARLENE", "M.I.": "C", "AGE": "28", "SEX": "F", "BIRTHDAY": "1998-05-22",
+        "ADDRESS": "Brgy. Baras, Palo, Leyte", "CHIEF COMPLAIN": "Dysuria with severe hypogastric pain and chills",
+        "DIAGNOSIS": "Acute Cystitis / UTI", "DOCTOR": "DR. OCHEA", "PROCEDURES DONE": "Urinalysis, Foley insertion",
+        "TRIAGE SCALE - I": "", "TRIAGE SCALE - II": "Level 3 - Urgent", "TRIAGE SCALE - III": "",
+        "DISPOSITION": "TREATED AND DISCHARGED", "REFUSED ADMISSION REASON": "", "MINOR OR": "NO", "MEDICO LEGAL": "NO",
+        "ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)": "320.00", "WITH RX": "YES", "NEW": "NO", "DISPOSITION 2": "HOME", "NEW 2": "", "CONDITION ON DISCHARGE": "IMPROVED"
+      },
+      {
+        "NO.": "3", "DATE OF ARRIVAL": "2026-09-01", "TIME OF ARRIVAL": "08:45", "TIME SEEN & ASSESTED BY ER": "08:50",
+        "TIME INFORMED ROD": "08:52", "TIME PATIENT IS SEEN BY ROD": "09:00", "DATE OF DISCHARGE": "2026-09-01", "TIME DISCHARGE": "11:15",
+        "TIME DISCHARGE BY NURSE": "11:20", "TIME LAPSED (NOD ASSESSMENT)": "5 mins", "TIME LAPSE (ROD)": "8 mins", "TIME LAPSE (ROD) 2": "",
+        "TOTAL NOD TIME LAPSE": "13 mins", "TIME LAPSED (ARRIVAL TO DISCHARGED)": "150 mins", "HOSPITAL NO.": "ER-26-00903",
+        "LAST NAME": "MENDOZA", "FIRST NAME": "GABRIEL", "M.I.": "T", "AGE": "7", "SEX": "M", "BIRTHDAY": "2019-08-11",
+        "ADDRESS": "San Jose, Tacloban City", "CHIEF COMPLAIN": "High grade fever x 4 days with petechial rash",
+        "DIAGNOSIS": "Dengue Fever with Warning Signs", "DOCTOR": "DR. GONGORA", "PROCEDURES DONE": "Dengue Duo test, CBC, Peripheral smear",
+        "TRIAGE SCALE - I": "", "TRIAGE SCALE - II": "Level 2 - Emergent", "TRIAGE SCALE - III": "",
+        "DISPOSITION": "ADMITTED", "REFUSED ADMISSION REASON": "", "MINOR OR": "NO", "MEDICO LEGAL": "NO",
+        "ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)": "600.00", "WITH RX": "YES", "NEW": "YES", "DISPOSITION 2": "PEDIA WARD", "NEW 2": "", "CONDITION ON DISCHARGE": "STABLE"
+      },
+      {
+        "NO.": "4", "DATE OF ARRIVAL": "2026-09-01", "TIME OF ARRIVAL": "09:20", "TIME SEEN & ASSESTED BY ER": "09:25",
+        "TIME INFORMED ROD": "09:26", "TIME PATIENT IS SEEN BY ROD": "09:35", "DATE OF DISCHARGE": "2026-09-01", "TIME DISCHARGE": "10:45",
+        "TIME DISCHARGE BY NURSE": "10:50", "TIME LAPSED (NOD ASSESSMENT)": "5 mins", "TIME LAPSE (ROD)": "9 mins", "TIME LAPSE (ROD) 2": "",
+        "TOTAL NOD TIME LAPSE": "14 mins", "TIME LAPSED (ARRIVAL TO DISCHARGED)": "85 mins", "HOSPITAL NO.": "ER-26-00904",
+        "LAST NAME": "CABRERA", "FIRST NAME": "LORENZO", "M.I.": "D", "AGE": "36", "SEX": "M", "BIRTHDAY": "1990-11-03",
+        "ADDRESS": "Campetic, Palo, Leyte", "CHIEF COMPLAIN": "Lacerated wound on left index finger s/p glass cut",
+        "DIAGNOSIS": "Open Lacerated Wound L Hand; Tetanus Prophylaxis", "DOCTOR": "DR. OCHEA", "PROCEDURES DONE": "Wound debridement, Suture (3 stitches), ATS",
+        "TRIAGE SCALE - I": "", "TRIAGE SCALE - II": "", "TRIAGE SCALE - III": "Level 3 - Urgent",
+        "DISPOSITION": "TREATED AND DISCHARGED", "REFUSED ADMISSION REASON": "", "MINOR OR": "YES", "MEDICO LEGAL": "NO",
+        "ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)": "750.00", "WITH RX": "YES", "NEW": "NO", "DISPOSITION 2": "HOME", "NEW 2": "", "CONDITION ON DISCHARGE": "IMPROVED"
+      },
+      {
+        "NO.": "5", "DATE OF ARRIVAL": "2026-09-01", "TIME OF ARRIVAL": "10:00", "TIME SEEN & ASSESTED BY ER": "10:10",
+        "TIME INFORMED ROD": "10:12", "TIME PATIENT IS SEEN BY ROD": "10:20", "DATE OF DISCHARGE": "2026-09-01", "TIME DISCHARGE": "12:15",
+        "TIME DISCHARGE BY NURSE": "12:20", "TIME LAPSED (NOD ASSESSMENT)": "10 mins", "TIME LAPSE (ROD)": "8 mins", "TIME LAPSE (ROD) 2": "",
+        "TOTAL NOD TIME LAPSE": "18 mins", "TIME LAPSED (ARRIVAL TO DISCHARGED)": "135 mins", "HOSPITAL NO.": "ER-26-00905",
+        "LAST NAME": "ALVAREZ", "FIRST NAME": "TERESA", "M.I.": "S", "AGE": "71", "SEX": "F", "BIRTHDAY": "1955-02-19",
+        "ADDRESS": "Tanauan, Leyte", "CHIEF COMPLAIN": "Dizziness, lightheadedness, BP 190/110 mmHg",
+        "DIAGNOSIS": "Hypertensive Urgency", "DOCTOR": "DR. KANONGKONG", "PROCEDURES DONE": "ECG, Blood Sugar, Captopril 25mg SL",
+        "TRIAGE SCALE - I": "", "TRIAGE SCALE - II": "Level 2 - Emergent", "TRIAGE SCALE - III": "",
+        "DISPOSITION": "TREATED AND DISCHARGED", "REFUSED ADMISSION REASON": "", "MINOR OR": "NO", "MEDICO LEGAL": "NO",
+        "ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)": "450.00", "WITH RX": "YES", "NEW": "NO", "DISPOSITION 2": "HOME", "NEW 2": "", "CONDITION ON DISCHARGE": "IMPROVED"
+      },
+      {
+        "NO.": "6", "DATE OF ARRIVAL": "2026-09-01", "TIME OF ARRIVAL": "10:40", "TIME SEEN & ASSESTED BY ER": "10:45",
+        "TIME INFORMED ROD": "10:47", "TIME PATIENT IS SEEN BY ROD": "10:55", "DATE OF DISCHARGE": "2026-09-01", "TIME DISCHARGE": "13:30",
+        "TIME DISCHARGE BY NURSE": "13:35", "TIME LAPSED (NOD ASSESSMENT)": "5 mins", "TIME LAPSE (ROD)": "8 mins", "TIME LAPSE (ROD) 2": "",
+        "TOTAL NOD TIME LAPSE": "13 mins", "TIME LAPSED (ARRIVAL TO DISCHARGED)": "170 mins", "HOSPITAL NO.": "ER-26-00906",
+        "LAST NAME": "VILLANUEVA", "FIRST NAME": "RODOLFO", "M.I.": "A", "AGE": "42", "SEX": "M", "BIRTHDAY": "1984-09-30",
+        "ADDRESS": "Candahug, Palo, Leyte", "CHIEF COMPLAIN": "Severe epigastric pain radiating to back after heavy meal",
+        "DIAGNOSIS": "Acute Pancreatitis; Dyspepsia", "DOCTOR": "DR. GONGORA", "PROCEDURES DONE": "Serum Amylase/Lipase, CBC, IV fluids",
+        "TRIAGE SCALE - I": "", "TRIAGE SCALE - II": "Level 2 - Emergent", "TRIAGE SCALE - III": "",
+        "DISPOSITION": "ADMITTED", "REFUSED ADMISSION REASON": "", "MINOR OR": "NO", "MEDICO LEGAL": "NO",
+        "ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)": "1100.00", "WITH RX": "YES", "NEW": "YES", "DISPOSITION 2": "SURGICAL WARD", "NEW 2": "", "CONDITION ON DISCHARGE": "STABLE"
+      },
+      {
+        "NO.": "7", "DATE OF ARRIVAL": "2026-09-01", "TIME OF ARRIVAL": "11:15", "TIME SEEN & ASSESTED BY ER": "11:20",
+        "TIME INFORMED ROD": "11:22", "TIME PATIENT IS SEEN BY ROD": "11:30", "DATE OF DISCHARGE": "2026-09-01", "TIME DISCHARGE": "12:50",
+        "TIME DISCHARGE BY NURSE": "12:55", "TIME LAPSED (NOD ASSESSMENT)": "5 mins", "TIME LAPSE (ROD)": "8 mins", "TIME LAPSE (ROD) 2": "",
+        "TOTAL NOD TIME LAPSE": "13 mins", "TIME LAPSED (ARRIVAL TO DISCHARGED)": "95 mins", "HOSPITAL NO.": "ER-26-00907",
+        "LAST NAME": "REYES", "FIRST NAME": "BEATRICE", "M.I.": "F", "AGE": "16", "SEX": "F", "BIRTHDAY": "2010-06-04",
+        "ADDRESS": "Alangalang, Leyte", "CHIEF COMPLAIN": "Severe wheezing, chest indrawing, asthma exacerbation",
+        "DIAGNOSIS": "Bronchial Asthma in Acute Exacerbation", "DOCTOR": "DR. OCHEA", "PROCEDURES DONE": "Salbutamol/Ipratropium neb x 2, Hydrocortisone IV",
+        "TRIAGE SCALE - I": "", "TRIAGE SCALE - II": "Level 2 - Emergent", "TRIAGE SCALE - III": "",
+        "DISPOSITION": "TREATED AND DISCHARGED", "REFUSED ADMISSION REASON": "", "MINOR OR": "NO", "MEDICO LEGAL": "NO",
+        "ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)": "550.00", "WITH RX": "YES", "NEW": "NO", "DISPOSITION 2": "HOME", "NEW 2": "", "CONDITION ON DISCHARGE": "IMPROVED"
+      },
+      {
+        "NO.": "8", "DATE OF ARRIVAL": "2026-09-01", "TIME OF ARRIVAL": "12:00", "TIME SEEN & ASSESTED BY ER": "12:05",
+        "TIME INFORMED ROD": "12:06", "TIME PATIENT IS SEEN BY ROD": "12:12", "DATE OF DISCHARGE": "2026-09-01", "TIME DISCHARGE": "14:10",
+        "TIME DISCHARGE BY NURSE": "14:15", "TIME LAPSED (NOD ASSESSMENT)": "5 mins", "TIME LAPSE (ROD)": "6 mins", "TIME LAPSE (ROD) 2": "",
+        "TOTAL NOD TIME LAPSE": "11 mins", "TIME LAPSED (ARRIVAL TO DISCHARGED)": "130 mins", "HOSPITAL NO.": "ER-26-00908",
+        "LAST NAME": "TAN", "FIRST NAME": "CHRISTOPHER", "M.I.": "B", "AGE": "24", "SEX": "M", "BIRTHDAY": "2002-01-17",
+        "ADDRESS": "Palo Proper, Leyte", "CHIEF COMPLAIN": "Vehicular crash; abrasions on both knees and forehead",
+        "DIAGNOSIS": "Multiple Physical Injuries s/p Motorcycle Accident", "DOCTOR": "DR. KANONGKONG", "PROCEDURES DONE": "Wound cleaning, Dressing, Skull X-ray",
+        "TRIAGE SCALE - I": "", "TRIAGE SCALE - II": "Level 3 - Urgent", "TRIAGE SCALE - III": "",
+        "DISPOSITION": "REFUSED ADMISSION", "REFUSED ADMISSION REASON": "Financial / Prefers private clinic follow-up", "MINOR OR": "NO", "MEDICO LEGAL": "YES",
+        "ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)": "680.00", "WITH RX": "YES", "NEW": "YES", "DISPOSITION 2": "HOME AGAINST MEDICAL ADVICE", "NEW 2": "", "CONDITION ON DISCHARGE": "STABLE"
+      }
+    ];
+
+    // Initialization on DOM Load
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      bindGlobalEvents();
+    });
+
+    function bindGlobalEvents() {
+      // File upload listener
+      const fileInput = document.getElementById('excel-file-input');
+      fileInput.addEventListener('change', handleUpload);
+
+      // Drag and drop setup
+      const dropZone = document.getElementById('upload-zone');
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-med-500', 'bg-med-50/40');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-med-500', 'bg-med-50/40');
+      });
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-med-500', 'bg-med-50/40');
+        if (e.dataTransfer.files.length) {
+          parseExcelFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      // Universal search input
+      const globalSearch = document.getElementById('global-search');
+      const clearBtn = document.getElementById('clear-search-btn');
+      globalSearch.addEventListener('input', () => {
+        globalQuery = globalSearch.value;
+        clearBtn.classList.toggle('hidden', !globalQuery);
+        executePrecisionFilter();
+      });
+      clearBtn.addEventListener('click', () => {
+        globalSearch.value = '';
+        globalQuery = '';
+        clearBtn.classList.add('hidden');
+        executePrecisionFilter();
+      });
+
+      // Quick slicers listeners
+      document.getElementById('slicer-doctor').addEventListener('change', (e) => { slicerDoctor = e.target.value; executePrecisionFilter(); });
+      document.getElementById('slicer-disposition').addEventListener('change', (e) => { slicerDisposition = e.target.value; executePrecisionFilter(); });
+      document.getElementById('slicer-triage').addEventListener('change', (e) => { slicerTriage = e.target.value; executePrecisionFilter(); });
+      document.getElementById('slicer-age-bracket').addEventListener('change', (e) => { slicerAgeBracket = e.target.value; executePrecisionFilter(); });
+      document.getElementById('slicer-sex').addEventListener('change', (e) => { slicerSex = e.target.value; executePrecisionFilter(); });
+      document.getElementById('slicer-condition').addEventListener('change', (e) => { slicerCondition = e.target.value; executePrecisionFilter(); });
+
+      // Action buttons
+      document.getElementById('btn-reset-filters').addEventListener('click', resetAllFilters);
+      document.getElementById('btn-load-demo').addEventListener('click', loadSampleData);
+      document.getElementById('btn-export-excel').addEventListener('click', () => exportData('xlsx'));
+      document.getElementById('btn-export-csv').addEventListener('click', () => exportData('csv'));
+      document.getElementById('btn-toggle-columns').addEventListener('click', () => toggleColumnsDrawer(true));
+
+      // Close modal on Escape key
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+      });
+    }
+
+    function handleUpload(e) {
+      if (e.target.files.length) {
+        parseExcelFile(e.target.files[0]);
+      }
+    }
+
+    function parseExcelFile(file) {
+      document.getElementById('dataset-title').textContent = `Loading: ${file.name}...`;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          rawWorkbook = XLSX.read(data, { type: 'array', cellDates: true });
+          
+          const firstSheet = rawWorkbook.Sheets[rawWorkbook.SheetNames[0]];
+          processSheet(firstSheet, file.name);
+        } catch (err) {
+          console.error("SheetJS parse error:", err);
+          alert("Could not parse file: " + err.message);
+          document.getElementById('dataset-title').textContent = "Upload failed";
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function processSheet(worksheet, filename = "ER Logsheet") {
+      // 2D raw array conversion preserving all cells
+      const matrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', blankrows: false });
+      if (!matrix || matrix.length === 0) {
+        alert("The uploaded Excel workbook contains no readable data.");
+        return;
+      }
+
+      // Auto-detect whether header is Row 2 (index 1) or Row 1 (index 0)
+      headerRowIndex = detectHeaderRowIndex(matrix);
+      document.getElementById('header-row-override').value = (headerRowIndex + 1).toString();
+
+      parseMatrixToRecords(matrix, headerRowIndex);
+
+      document.getElementById('dataset-title').textContent = `${filename} • ${allRecords.length} Total Patients Logged`;
+      
+      // Reveal Workspace
+      document.getElementById('upload-zone').classList.add('hidden');
+      const dash = document.getElementById('dashboard-section');
+      dash.classList.remove('hidden');
+      dash.classList.add('flex');
+      document.getElementById('btn-export-excel').disabled = false;
+      document.getElementById('btn-export-csv').disabled = false;
+
+      // Populate slicers and default preset
+      populateSlicers();
+      applyColumnPreset('clinical');
+      executePrecisionFilter();
+      lucide.createIcons();
+    }
+
+    // Zero-miss header row detector
+    function detectHeaderRowIndex(matrix) {
+      if (matrix.length <= 1) return 0;
+      
+      const clinicalKeywords = ["NO", "ARRIVAL", "TIME", "SEEN", "ROD", "DISCHARGE", "HOSPITAL", "LAST NAME", "DIAGNOSIS", "DOCTOR", "TRIAGE", "DISPOSITION"];
+      
+      // Check first 3 rows
+      for (let r = 0; r < Math.min(matrix.length, 3); r++) {
+        const row = matrix[r] || [];
+        const matches = row.filter(cell => {
+          const s = String(cell).toUpperCase();
+          return clinicalKeywords.some(kw => s.includes(kw));
+        }).length;
+
+        // If this row matches 3 or more typical hospital column headers, it is the true header row
+        if (matches >= 3) {
+          return r;
+        }
+      }
+      return 1; // Default to Row 2
+    }
+
+    function overrideHeaderRow(rowNumStr) {
+      headerRowIndex = parseInt(rowNumStr, 10) - 1;
+      if (rawWorkbook) {
+        const sheet = rawWorkbook.Sheets[rawWorkbook.SheetNames[0]];
+        const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false });
+        parseMatrixToRecords(matrix, headerRowIndex);
+        populateSlicers();
+        executePrecisionFilter();
+      }
+    }
+
+    // Transforms matrix into structured, normalized objects with ZERO data loss
+    function parseMatrixToRecords(matrix, hIndex) {
+      const headerRow = matrix[hIndex] || [];
+      
+      detectedHeaders = [];
+      let unknownIdx = 1;
+
+      // Ensure every header is trimmed and uniquely identified
+      headerRow.forEach((cell, idx) => {
+        let name = String(cell || '').trim();
+        if (!name) {
+          // If empty header in row 2, see if canonical 39 list has a match at this index
+          if (idx < CANONICAL_39_COLUMNS.length) {
+            name = CANONICAL_39_COLUMNS[idx];
+          } else {
+            name = `COLUMN_${unknownIdx++}`;
+          }
+        }
+        detectedHeaders.push(name);
+      });
+
+      // Guarantee any missing canonical column is recognized if file has extra empty slots
+      allRecords = [];
+      
+      for (let r = hIndex + 1; r < matrix.length; r++) {
+        const row = matrix[r];
+        if (!row || row.length === 0) continue;
+
+        // Check if row has any meaningful value (prevents dropping actual patient data with a blank hospital number)
+        const hasData = row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '');
+        if (!hasData) continue;
+
+        const rowObj = {};
+        detectedHeaders.forEach((colName, cIdx) => {
+          let val = row[cIdx];
+          
+          // Format date/time objects cleanly while retaining numeric/string fidelity
+          if (val instanceof Date) {
+            val = formatDateTimeCell(val, colName);
+          } else if (typeof val === 'number') {
+            val = handleExcelNumericFormats(val, colName);
+          } else if (val === null || val === undefined) {
+            val = '';
+          } else {
+            val = String(val).trim();
+          }
+
+          rowObj[colName] = val;
+        });
+
+        // Computed composite fields for ultra-reliable searching
+        const ln = rowObj['LAST NAME'] || '';
+        const fn = rowObj['FIRST NAME'] || '';
+        const mi = rowObj['M.I.'] || '';
+        rowObj['__PATIENT_NAME'] = `${ln}, ${fn} ${mi}`.trim();
+        
+        // Normalized single-string haystack for universal zero-miss search
+        rowObj['__SEARCH_INDEX'] = Object.values(rowObj)
+          .map(v => normalizeForSearch(v))
+          .join(' ');
+
+        allRecords.push(rowObj);
+      }
+
+      visibleColumns = [...detectedHeaders];
+    }
+
+    // Formats dates or time serials cleanly
+    function formatDateTimeCell(d, colName) {
+      const isTime = colName.toUpperCase().includes('TIME');
+      if (isTime) {
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      }
+      return d.toISOString().split('T')[0];
+    }
+
+    function handleExcelNumericFormats(num, colName) {
+      const colUpper = colName.toUpperCase();
+      // Excel time fraction (e.g. 0.35416666 = 08:30)
+      if (num > 0 && num < 1 && colUpper.includes('TIME')) {
+        const totalMinutes = Math.round(num * 24 * 60);
+        const hrs = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+      }
+      return String(num);
+    }
+
+    // String normalization that eliminates missed matches due to case, accents, and punctuation
+    function normalizeForSearch(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove diacritics
+        .replace(/\s+/g, ' ')                             // collapse multi-spaces
+        .trim();
+    }
+
+    // Demo Data Loader
+    function loadSampleData() {
+      detectedHeaders = [...CANONICAL_39_COLUMNS];
+      allRecords = SAMPLE_RECORDS.map(rec => {
+        const copy = { ...rec };
+        const ln = copy['LAST NAME'] || '';
+        const fn = copy['FIRST NAME'] || '';
+        const mi = copy['M.I.'] || '';
+        copy['__PATIENT_NAME'] = `${ln}, ${fn} ${mi}`.trim();
+        copy['__SEARCH_INDEX'] = Object.values(copy).map(v => normalizeForSearch(v)).join(' ');
+        return copy;
+      });
+
+      document.getElementById('dataset-title').textContent = "Demo Dataset: Sept 2026 Emergency OPD Consultations (39 Canonical Columns)";
+      document.getElementById('upload-zone').classList.add('hidden');
+      const dash = document.getElementById('dashboard-section');
+      dash.classList.remove('hidden');
+      dash.classList.add('flex');
+      document.getElementById('btn-export-excel').disabled = false;
+      document.getElementById('btn-export-csv').disabled = false;
+
+      populateSlicers();
+      applyColumnPreset('clinical');
+      executePrecisionFilter();
+      lucide.createIcons();
+    }
+
+    function populateSlicers() {
+      const docKey = findKey(['DOCTOR', 'PHYSICIAN', 'ROD']);
+      const dispoKey = findKey(['DISPOSITION', 'DISPOSITION 2']);
+      const triageKey = findKey(['TRIAGE SCALE - I', 'TRIAGE SCALE - II', 'TRIAGE SCALE', 'TRIAGE']);
+      const condKey = findKey(['CONDITION ON DISCHARGE', 'CONDITION']);
+
+      fillSlicerOptions('slicer-doctor', docKey);
+      fillSlicerOptions('slicer-disposition', dispoKey);
+      fillSlicerOptions('slicer-triage', triageKey);
+      fillSlicerOptions('slicer-condition', condKey);
+      buildColumnDrawerCheckboxes();
+    }
+
+    function fillSlicerOptions(selectId, dataKey) {
+      const select = document.getElementById(selectId);
+      const defaultOptionText = select.options[0].text;
+      select.innerHTML = `<option value="">${defaultOptionText}</option>`;
+      
+      if (!dataKey) return;
+
+      const counts = {};
+      allRecords.forEach(r => {
+        const val = (r[dataKey] || '').trim();
+        if (val) {
+          counts[val] = (counts[val] || 0) + 1;
+        }
+      });
+
+      Object.keys(counts).sort().forEach(val => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = `${val} (${counts[val]})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function findKey(candidates) {
+      return detectedHeaders.find(h => 
+        candidates.some(c => h.toUpperCase().trim() === c.toUpperCase().trim())
+      ) || detectedHeaders.find(h => 
+        candidates.some(c => h.toUpperCase().trim().includes(c.toUpperCase().trim()))
+      );
+    }
+
+
+    // CORE FILTER ENGINE: Guarantees zero missed records
+    function executePrecisionFilter() {
+      const normGlobalQuery = normalizeForSearch(globalQuery);
+
+      const docKey = findKey(['DOCTOR', 'PHYSICIAN', 'ROD']);
+      const dispoKey = findKey(['DISPOSITION']);
+      const triageKeys = ['TRIAGE SCALE - I', 'TRIAGE SCALE - II', 'TRIAGE SCALE - III'].filter(k => detectedHeaders.includes(k));
+      const condKey = findKey(['CONDITION ON DISCHARGE', 'CONDITION']);
+      const ageKey = findKey(['AGE']);
+      const sexKey = findKey(['SEX', 'GENDER']);
+
+      filteredRecords = allRecords.filter(row => {
+        
+        // 1. Universal Search (Normalized text across entire row)
+        if (normGlobalQuery) {
+          if (!row['__SEARCH_INDEX'].includes(normGlobalQuery)) {
+            // Also check composite full patient name specifically
+            const normPName = normalizeForSearch(row['__PATIENT_NAME']);
+            if (!normPName.includes(normGlobalQuery)) {
+              return false;
+            }
+          }
+        }
+
+        // 2. Doctor Slicer
+        if (slicerDoctor && docKey) {
+          if ((row[docKey] || '').trim() !== slicerDoctor) return false;
+        }
+
+        // 3. Disposition Slicer
+        if (slicerDisposition && dispoKey) {
+          if ((row[dispoKey] || '').trim() !== slicerDisposition) return false;
+        }
+
+        // 4. Triage Slicer
+        if (slicerTriage) {
+          let matchedTriage = false;
+          if (triageKeys.length > 0) {
+            matchedTriage = triageKeys.some(k => (row[k] || '').trim() === slicerTriage);
+          } else {
+            const fallbackKey = findKey(['TRIAGE']);
+            if (fallbackKey && (row[fallbackKey] || '').trim() === slicerTriage) {
+              matchedTriage = true;
+            }
+          }
+          if (!matchedTriage) return false;
+        }
+
+        // 5. Condition Slicer
+        if (slicerCondition && condKey) {
+          if ((row[condKey] || '').trim() !== slicerCondition) return false;
+        }
+
+        // 6. Sex Slicer
+        if (slicerSex && sexKey) {
+          const s = (row[sexKey] || '').trim().toUpperCase();
+          if (!s.startsWith(slicerSex)) return false;
+        }
+
+        // 7. Age Demographic Slicer
+        if (slicerAgeBracket && ageKey) {
+          const ageNum = parseInt(row[ageKey], 10);
+          if (isNaN(ageNum)) return false;
+          if (slicerAgeBracket === 'pediatric' && ageNum > 18) return false;
+          if (slicerAgeBracket === 'adult' && (ageNum < 19 || ageNum > 59)) return false;
+          if (slicerAgeBracket === 'geriatric' && ageNum < 60) return false;
+        }
+
+        // 8. Individual Per-Column Filters (Zero miss matching)
+        for (const colName in columnFilters) {
+          const filterTerm = columnFilters[colName];
+          if (!filterTerm) continue;
+
+          const cellValue = row[colName] || '';
+
+          // Blank explicit filtering
+          if (filterTerm === '[[BLANK]]') {
+            if (cellValue.trim() !== '') return false;
+            continue;
+          }
+          if (filterTerm === '[[NON_BLANK]]') {
+            if (cellValue.trim() === '') return false;
+            continue;
+          }
+
+          // Normalized substring search for text columns
+          const normCell = normalizeForSearch(cellValue);
+          const normTerm = normalizeForSearch(filterTerm);
+
+          if (!normCell.includes(normTerm)) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      // Apply sorting if a column header was clicked
+      if (sortColumn) {
+        performSort();
+      }
+
+      // Reset to page 1 to ensure user views valid range
+      currentPage = 1;
+
+      // Update UI components
+      updateKPIs();
+      renderActiveFilterChips();
+      renderTableHeadersAndFilters();
+      renderTableData();
+    }
+
+    function handlePerColumnFilter(colName, val) {
+      if (!val || val.trim() === '') {
+        delete columnFilters[colName];
+      } else {
+        columnFilters[colName] = val;
+      }
+      executePrecisionFilter();
+    }
+
+    function resetAllFilters() {
+      globalQuery = '';
+      document.getElementById('global-search').value = '';
+      document.getElementById('clear-search-btn').classList.add('hidden');
+
+      slicerDoctor = '';
+      document.getElementById('slicer-doctor').value = '';
+      slicerDisposition = '';
+      document.getElementById('slicer-disposition').value = '';
+      slicerTriage = '';
+      document.getElementById('slicer-triage').value = '';
+      slicerAgeBracket = '';
+      document.getElementById('slicer-age-bracket').value = '';
+      slicerSex = '';
+      document.getElementById('slicer-sex').value = '';
+      slicerCondition = '';
+      document.getElementById('slicer-condition').value = '';
+
+      columnFilters = {};
+      executePrecisionFilter();
+    }
+
+    function removeSingleFilter(type, key) {
+      if (type === 'global') {
+        globalQuery = '';
+        document.getElementById('global-search').value = '';
+        document.getElementById('clear-search-btn').classList.add('hidden');
+      } else if (type === 'slicer') {
+        if (key === 'doctor') { slicerDoctor = ''; document.getElementById('slicer-doctor').value = ''; }
+        if (key === 'disposition') { slicerDisposition = ''; document.getElementById('slicer-disposition').value = ''; }
+        if (key === 'triage') { slicerTriage = ''; document.getElementById('slicer-triage').value = ''; }
+        if (key === 'age') { slicerAgeBracket = ''; document.getElementById('slicer-age-bracket').value = ''; }
+        if (key === 'sex') { slicerSex = ''; document.getElementById('slicer-sex').value = ''; }
+        if (key === 'condition') { slicerCondition = ''; document.getElementById('slicer-condition').value = ''; }
+      } else if (type === 'column') {
+        delete columnFilters[key];
+      }
+      executePrecisionFilter();
+    }
+
+    function renderActiveFilterChips() {
+      const container = document.getElementById('active-filter-chips');
+      const emptyLabel = document.getElementById('no-active-filters-label');
+      
+      // Remove previous chips
+      const chips = container.querySelectorAll('.filter-chip');
+      chips.forEach(c => c.remove());
+
+      const activeList = [];
+
+      if (globalQuery) {
+        activeList.push({ type: 'global', key: 'search', label: `Search: "${globalQuery}"` });
+      }
+      if (slicerDoctor) {
+        activeList.push({ type: 'slicer', key: 'doctor', label: `Doctor: ${slicerDoctor}` });
+      }
+      if (slicerDisposition) {
+        activeList.push({ type: 'slicer', key: 'disposition', label: `Disposition: ${slicerDisposition}` });
+      }
+      if (slicerTriage) {
+        activeList.push({ type: 'slicer', key: 'triage', label: `Triage: ${slicerTriage}` });
+      }
+      if (slicerAgeBracket) {
+        activeList.push({ type: 'slicer', key: 'age', label: `Age: ${slicerAgeBracket}` });
+      }
+      if (slicerSex) {
+        activeList.push({ type: 'slicer', key: 'sex', label: `Sex: ${slicerSex}` });
+      }
+      if (slicerCondition) {
+        activeList.push({ type: 'slicer', key: 'condition', label: `Condition: ${slicerCondition}` });
+      }
+
+      for (const col in columnFilters) {
+        const val = columnFilters[col];
+        const displayVal = val === '[[BLANK]]' ? '(Blanks Only)' : (val === '[[NON_BLANK]]' ? '(Non-Blanks)' : val);
+        activeList.push({ type: 'column', key: col, label: `${col}: "${displayVal}"` });
+      }
+
+      if (activeList.length === 0) {
+        emptyLabel.classList.remove('hidden');
+        return;
+      }
+
+      emptyLabel.classList.add('hidden');
+
+      activeList.forEach(item => {
+        const badge = document.createElement('span');
+        badge.className = "filter-chip inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-med-100 text-med-800 border border-med-200 animate-fadeIn";
+        badge.innerHTML = `
+          <span>${escapeHtml(item.label)}</span>
+          <button onclick="removeSingleFilter('${item.type}', '${escapeHtml(item.key)}')" class="hover:text-med-900 rounded-full p-0.5">
+            <i data-lucide="x" class="w-3 h-3"></i>
+          </button>
+        `;
+        container.appendChild(badge);
+      });
+
+      lucide.createIcons();
+    }
+
+    function updateKPIs() {
+      const total = allRecords.length;
+      const count = filteredRecords.length;
+
+      document.getElementById('kpi-filtered').textContent = count;
+      document.getElementById('kpi-total').textContent = total;
+
+      const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+      document.getElementById('kpi-match-percent').textContent = `${pct}% of total records matching`;
+
+      const docKey = findKey(['DOCTOR', 'PHYSICIAN', 'ROD']);
+      const dxKey = findKey(['DIAGNOSIS']);
+      const dispoKey = findKey(['DISPOSITION']);
+      const sexKey = findKey(['SEX']);
+      const ageKey = findKey(['AGE']);
+      const turnKey = findKey(['TIME LAPSED (ARRIVAL TO DISCHARGED)', 'TOTAL NOD TIME LAPSE', 'TIME LAPSED']);
+
+      // Top Doctor
+      if (docKey) {
+        const docs = {};
+        filteredRecords.forEach(r => {
+          const d = (r[docKey] || '').trim();
+          if (d && d !== '-') docs[d] = (docs[d] || 0) + 1;
+        });
+        const topD = getTopEntry(docs);
+        if (topD) {
+          document.getElementById('kpi-top-doctor').textContent = topD.key;
+          document.getElementById('kpi-doctor-count').textContent = `${topD.count} consultations`;
+        } else {
+          document.getElementById('kpi-top-doctor').textContent = '--';
+          document.getElementById('kpi-doctor-count').textContent = '0 consults';
+        }
+      }
+
+      // Top Diagnosis
+      if (dxKey) {
+        const dxs = {};
+        filteredRecords.forEach(r => {
+          const d = (r[dxKey] || '').trim();
+          if (d && d !== '-') dxs[d] = (dxs[d] || 0) + 1;
+        });
+        const topDx = getTopEntry(dxs);
+        if (topDx) {
+          document.getElementById('kpi-top-dx').textContent = topDx.key;
+          document.getElementById('kpi-top-dx-count').textContent = `${topDx.count} patients`;
+        } else {
+          document.getElementById('kpi-top-dx').textContent = '--';
+          document.getElementById('kpi-top-dx-count').textContent = '0 cases';
+        }
+      }
+
+      // Turnaround Time
+      if (turnKey) {
+        let sum = 0, valid = 0;
+        filteredRecords.forEach(r => {
+          const v = r[turnKey];
+          if (v) {
+            const m = String(v).match(/\d+/);
+            if (m) {
+              sum += parseInt(m[0], 10);
+              valid++;
+            }
+          }
+        });
+        if (valid > 0) {
+          const avg = Math.round(sum / valid);
+          document.getElementById('kpi-avg-turnaround').textContent = `${avg} min`;
+        } else {
+          document.getElementById('kpi-avg-turnaround').textContent = '--';
+        }
+      }
+
+      // Admitted vs Treated
+      if (dispoKey) {
+        let admitted = 0, discharged = 0;
+        filteredRecords.forEach(r => {
+          const dispo = (r[dispoKey] || '').toUpperCase();
+          if (dispo.includes('ADMIT')) admitted++;
+          if (dispo.includes('DISCHARGE') || dispo.includes('TREATED') || dispo.includes('HOME')) discharged++;
+        });
+        document.getElementById('kpi-admit-count').textContent = `${admitted} Adm`;
+        document.getElementById('kpi-discharged-count').textContent = `${discharged} Disch`;
+        const admitPct = count > 0 ? Math.round((admitted / count) * 100) : 0;
+        document.getElementById('kpi-admit-percent').textContent = `${admitPct}% Admission Rate`;
+      }
+
+      // Sex & Age
+      let males = 0, females = 0, ageSum = 0, ageCount = 0;
+      filteredRecords.forEach(r => {
+        if (sexKey) {
+          const s = (r[sexKey] || '').toUpperCase().trim();
+          if (s.startsWith('M')) males++;
+          if (s.startsWith('F')) females++;
+        }
+        if (ageKey) {
+          const a = parseInt(r[ageKey], 10);
+          if (!isNaN(a)) {
+            ageSum += a;
+            ageCount++;
+          }
+        }
+      });
+      document.getElementById('kpi-male-count').textContent = `${males} M`;
+      document.getElementById('kpi-female-count').textContent = `${females} F`;
+      const avgAge = ageCount > 0 ? Math.round(ageSum / ageCount) : '--';
+      document.getElementById('kpi-avg-age').textContent = `Avg Age: ${avgAge} y/o`;
+    }
+
+    function getTopEntry(map) {
+      let bestKey = null, bestCount = -1;
+      for (const k in map) {
+        if (map[k] > bestCount) {
+          bestCount = map[k];
+          bestKey = k;
+        }
+      }
+      return bestKey ? { key: bestKey, count: bestCount } : null;
+    }
+
+
+    function renderTableHeadersAndFilters() {
+      const headerTr = document.getElementById('table-headers-tr');
+      const filterTr = document.getElementById('table-filter-inputs-tr');
+
+      headerTr.innerHTML = '';
+      filterTr.innerHTML = '';
+
+      visibleColumns.forEach((col, idx) => {
+        // --- Header Cell ---
+        const th = document.createElement('th');
+        th.className = "px-3 py-2 text-[10px] font-bold text-slate-700 tracking-wider uppercase select-none cursor-pointer hover:bg-slate-200 transition-colors whitespace-nowrap border-r border-slate-200";
+        
+        let sortIcon = '<i data-lucide="arrow-up-down" class="w-3 h-3 inline text-slate-300 ml-1"></i>';
+        if (sortColumn === col) {
+          sortIcon = sortDirection === 'asc'
+            ? '<i data-lucide="arrow-up" class="w-3 h-3 inline text-med-700 ml-1 font-bold"></i>'
+            : '<i data-lucide="arrow-down" class="w-3 h-3 inline text-med-700 ml-1 font-bold"></i>';
+        }
+
+        th.innerHTML = `<div class="flex items-center justify-between gap-1"><span>${escapeHtml(col)}</span>${sortIcon}</div>`;
+        th.addEventListener('click', () => handleSort(col));
+        headerTr.appendChild(th);
+
+        // --- Filter Cell (Direct inline filter per column) ---
+        const tdFilter = document.createElement('td');
+        tdFilter.className = "p-1.5 border-r border-slate-200 bg-slate-100/90";
+
+        const currentFilterVal = columnFilters[col] || '';
+
+        tdFilter.innerHTML = `
+          <div class="relative flex items-center">
+            <input type="text" 
+                   value="${escapeHtml(currentFilterVal === '[[BLANK]]' ? '(Blanks)' : (currentFilterVal === '[[NON_BLANK]]' ? '(Non-Blanks)' : currentFilterVal))}"
+                   placeholder="Filter..." 
+                   data-col="${escapeHtml(col)}"
+                   class="col-filter-input w-full px-2 py-1 text-[11px] bg-white border border-slate-300 rounded focus:border-med-500 outline-hidden font-normal text-slate-800 placeholder-slate-400" />
+            <button type="button" title="Blank options" onclick="showBlankMenu(event, '${escapeHtml(col)}')" class="absolute right-1 text-slate-400 hover:text-slate-600 p-0.5 text-[9px]">
+              <i data-lucide="more-vertical" class="w-3 h-3"></i>
+            </button>
+          </div>
+        `;
+
+        const inputElem = tdFilter.querySelector('.col-filter-input');
+        inputElem.addEventListener('input', (e) => {
+          handlePerColumnFilter(col, e.target.value);
+        });
+
+        filterTr.appendChild(tdFilter);
+      });
+
+      // Actions Column
+      const thAction = document.createElement('th');
+      thAction.className = "px-3 py-2 text-[10px] font-bold text-slate-700 tracking-wider uppercase text-right whitespace-nowrap";
+      thAction.textContent = "Chart";
+      headerTr.appendChild(thAction);
+
+      const tdActionFilter = document.createElement('td');
+      tdActionFilter.className = "p-1 bg-slate-100/90 text-right";
+      tdActionFilter.innerHTML = `
+        <button onclick="resetAllFilters()" title="Reset all column filters" class="p-1 text-slate-400 hover:text-rose-600 transition">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+        </button>
+      `;
+      filterTr.appendChild(tdActionFilter);
+
+      document.getElementById('visible-col-count').textContent = visibleColumns.length;
+      lucide.createIcons();
+    }
+
+    function showBlankMenu(event, colName) {
+      event.stopPropagation();
+      const current = columnFilters[colName] || '';
+      
+      const choice = prompt(`Filter options for [${colName}]:\n1: Show Non-Empty Rows Only\n2: Show Blanks Only\n3: Clear Filter for this Column\n\nEnter 1, 2, or 3:`, "1");
+      
+      if (choice === "1") {
+        handlePerColumnFilter(colName, '[[NON_BLANK]]');
+      } else if (choice === "2") {
+        handlePerColumnFilter(colName, '[[BLANK]]');
+      } else if (choice === "3") {
+        handlePerColumnFilter(colName, '');
+      }
+    }
+
+    function renderTableData() {
+      const tableBody = document.getElementById('table-body');
+      const noRecords = document.getElementById('no-records-view');
+
+      if (filteredRecords.length === 0) {
+        tableBody.innerHTML = '';
+        noRecords.classList.remove('hidden');
+        document.getElementById('table-record-counter').textContent = '0 records found';
+        document.getElementById('table-sub-counter').textContent = '';
+        document.getElementById('page-label').textContent = 'Page 0 of 0';
+        document.getElementById('btn-page-prev').disabled = true;
+        document.getElementById('btn-page-next').disabled = true;
+        lucide.createIcons();
+        return;
+      }
+
+      noRecords.classList.add('hidden');
+
+      // Pagination math
+      const effPageSize = pageSize === -1 ? filteredRecords.length : pageSize;
+      const totalPages = Math.ceil(filteredRecords.length / effPageSize) || 1;
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const startIdx = (currentPage - 1) * effPageSize;
+      const endIdx = Math.min(startIdx + effPageSize, filteredRecords.length);
+      const rowsToShow = filteredRecords.slice(startIdx, endIdx);
+
+      document.getElementById('table-record-counter').textContent = `Showing ${startIdx + 1} - ${endIdx}`;
+      document.getElementById('table-sub-counter').textContent = `of ${filteredRecords.length} records`;
+      document.getElementById('page-label').textContent = `Page ${currentPage} of ${totalPages}`;
+      document.getElementById('btn-page-prev').disabled = (currentPage === 1);
+      document.getElementById('btn-page-next').disabled = (currentPage === totalPages);
+
+      tableBody.innerHTML = '';
+
+      rowsToShow.forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-med-50/40 transition-colors cursor-pointer group text-xs";
+        
+        // Clicking row opens full patient record modal
+        tr.addEventListener('click', () => openPatientModal(row));
+
+        visibleColumns.forEach(col => {
+          const td = document.createElement('td');
+          td.className = "px-3 py-2 text-slate-800 whitespace-nowrap border-b border-r border-slate-100";
+          
+          const rawVal = row[col] || '';
+          td.innerHTML = formatCellContent(col, rawVal);
+          tr.appendChild(td);
+        });
+
+        // Open Chart action icon
+        const tdAct = document.createElement('td');
+        tdAct.className = "px-3 py-2 text-right whitespace-nowrap border-b border-slate-100";
+        tdAct.innerHTML = `
+          <button class="p-1 rounded-md text-slate-400 group-hover:text-med-700 group-hover:bg-med-100 transition">
+            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+          </button>
+        `;
+        tr.appendChild(tdAct);
+
+        tableBody.appendChild(tr);
+      });
+
+      lucide.createIcons();
+    }
+
+    // Formats badges for high priority clinical fields
+    function formatCellContent(col, val) {
+      if (!val) return '<span class="text-slate-300 italic font-mono-code text-[11px]">-</span>';
+
+      const colUp = col.toUpperCase();
+
+      // Disposition Badges
+      if (colUp.includes('DISPOSITION')) {
+        const vUp = val.toUpperCase();
+        if (vUp.includes('ADMIT')) {
+          return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">${escapeHtml(val)}</span>`;
+        }
+        if (vUp.includes('DISCHARGE') || vUp.includes('TREATED') || vUp.includes('HOME')) {
+          return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">${escapeHtml(val)}</span>`;
+        }
+        if (vUp.includes('REFUSED')) {
+          return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">${escapeHtml(val)}</span>`;
+        }
+        return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700">${escapeHtml(val)}</span>`;
+      }
+
+      // Triage Badges
+      if (colUp.includes('TRIAGE')) {
+        if (val.includes('1') || val.toUpperCase().includes('RESUSCITATION')) {
+          return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-red-600 text-white shadow-2xs">${escapeHtml(val)}</span>`;
+        }
+        if (val.includes('2') || val.toUpperCase().includes('EMERGENT')) {
+          return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white">${escapeHtml(val)}</span>`;
+        }
+        if (val.includes('3') || val.toUpperCase().includes('URGENT')) {
+          return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-900 border border-yellow-200">${escapeHtml(val)}</span>`;
+        }
+      }
+
+      // Patient Names
+      if (colUp === 'LAST NAME' || colUp === 'FIRST NAME') {
+        return `<span class="font-bold text-slate-900">${escapeHtml(val)}</span>`;
+      }
+
+      // Time Lapse / Durations
+      if (colUp.includes('LAPSE') || colUp.includes('TIME')) {
+        return `<span class="font-mono-code text-slate-700">${escapeHtml(val)}</span>`;
+      }
+
+      // Medical Diagnoses
+      if (colUp.includes('DIAGNOSIS')) {
+        return `<span class="font-semibold text-slate-900">${escapeHtml(val)}</span>`;
+      }
+
+      return escapeHtml(val);
+    }
+
+    function handleSort(col) {
+      if (sortColumn === col) {
+        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortColumn = col;
+        sortDirection = 'asc';
+      }
+      performSort();
+      renderTableHeadersAndFilters();
+      renderTableData();
+    }
+
+    function performSort() {
+      if (!sortColumn) return;
+      filteredRecords.sort((a, b) => {
+        let va = a[sortColumn] || '';
+        let vb = b[sortColumn] || '';
+
+        // Numeric comparison
+        const na = parseFloat(va);
+        const nb = parseFloat(vb);
+        if (!isNaN(na) && !isNaN(nb) && String(na) === va.trim() && String(nb) === vb.trim()) {
+          return sortDirection === 'asc' ? na - nb : nb - na;
+        }
+
+        // Standard string locale comparison
+        return sortDirection === 'asc'
+          ? String(va).localeCompare(String(vb))
+          : String(vb).localeCompare(String(va));
+      });
+    }
+
+    function goToPage(p) {
+      currentPage = p;
+      renderTableData();
+    }
+
+    function changePageSize(size) {
+      pageSize = parseInt(size, 10);
+      currentPage = 1;
+      renderTableData();
+    }
+
+    function applyColumnPreset(presetKey) {
+      // Highlight active preset button
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.remove('bg-med-50', 'text-med-800', 'border-med-200');
+        b.classList.add('bg-slate-100', 'text-slate-700');
+      });
+      event?.target?.classList?.remove('bg-slate-100', 'text-slate-700');
+      event?.target?.classList?.add('bg-med-50', 'text-med-800', 'border', 'border-med-200');
+
+      if (presetKey === 'all') {
+        visibleColumns = [...detectedHeaders];
+      } else {
+        const targetList = PRESETS[presetKey] || [];
+        visibleColumns = detectedHeaders.filter(h => 
+          targetList.some(t => h.toUpperCase().trim() === t.toUpperCase().trim())
+        );
+        if (visibleColumns.length === 0) {
+          visibleColumns = detectedHeaders.slice(0, 10);
+        }
+      }
+
+      updateDrawerCheckboxStates();
+      renderTableHeadersAndFilters();
+      renderTableData();
+    }
+
+    function buildColumnDrawerCheckboxes() {
+      const container = document.getElementById('columns-checkbox-list');
+      container.innerHTML = '';
+
+      detectedHeaders.forEach(col => {
+        const item = document.createElement('label');
+        item.className = "column-checkbox-item flex items-center justify-between p-1.5 rounded hover:bg-slate-50 cursor-pointer text-slate-700";
+        item.dataset.colName = col.toLowerCase();
+
+        const checked = visibleColumns.includes(col);
+        item.innerHTML = `
+          <span class="truncate pr-2 font-medium">${escapeHtml(col)}</span>
+          <input type="checkbox" value="${escapeHtml(col)}" ${checked ? 'checked' : ''} 
+                 onchange="toggleColumnSingle('${escapeHtml(col)}', this.checked)"
+                 class="rounded text-med-600 focus:ring-med-500 h-4 w-4">
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function filterColumnDrawerList(query) {
+      const q = query.toLowerCase();
+      document.querySelectorAll('.column-checkbox-item').forEach(el => {
+        const matches = el.dataset.colName.includes(q);
+        el.classList.toggle('hidden', !matches);
+      });
+    }
+
+    function updateDrawerCheckboxStates() {
+      const cbs = document.querySelectorAll('#columns-checkbox-list input[type="checkbox"]');
+      cbs.forEach(cb => {
+        cb.checked = visibleColumns.includes(cb.value);
+      });
+    }
+
+    function toggleColumnSingle(col, isChecked) {
+      if (isChecked) {
+        if (!visibleColumns.includes(col)) visibleColumns.push(col);
+      } else {
+        visibleColumns = visibleColumns.filter(c => c !== col);
+      }
+      renderTableHeadersAndFilters();
+      renderTableData();
+    }
+
+    function selectAllColumns(selectAll) {
+      if (selectAll) {
+        visibleColumns = [...detectedHeaders];
+      } else {
+        // Minimum default columns
+        visibleColumns = detectedHeaders.slice(0, 7);
+      }
+      updateDrawerCheckboxStates();
+      renderTableHeadersAndFilters();
+      renderTableData();
+    }
+
+    function toggleColumnsDrawer(show) {
+      const drawer = document.getElementById('columns-drawer');
+      if (show) drawer.classList.remove('translate-x-full');
+      else drawer.classList.add('translate-x-full');
+    }
+
+
+    function openPatientModal(row) {
+      const pName = row['__PATIENT_NAME'] || `${row['LAST NAME'] || ''}, ${row['FIRST NAME'] || ''}`.trim() || 'Patient Record';
+      const hospNo = row[findKey(['HOSPITAL NO.', 'HOSPITAL NO', 'HOSP NO'])] || 'N/A';
+      const sex = row[findKey(['SEX'])] || '-';
+      const age = row[findKey(['AGE'])] || '-';
+      
+      const triageVal = row['TRIAGE SCALE - I'] || row['TRIAGE SCALE - II'] || row['TRIAGE SCALE - III'] || row[findKey(['TRIAGE'])] || 'Unassigned';
+
+      document.getElementById('modal-patient-name').textContent = pName;
+      document.getElementById('modal-patient-avatar').textContent = getInitials(pName);
+      document.getElementById('modal-sex-age-badge').textContent = `${sex} • ${age} y/o`;
+      document.getElementById('modal-triage-badge').textContent = `Triage: ${triageVal}`;
+      document.getElementById('modal-hosp-no').textContent = `Hospital No: ${hospNo}`;
+
+      // Clinical
+      document.getElementById('modal-complaint').textContent = row['CHIEF COMPLAIN'] || row[findKey(['CHIEF COMPLAIN', 'COMPLAIN'])] || 'None recorded';
+      document.getElementById('modal-diagnosis').textContent = row['DIAGNOSIS'] || row[findKey(['DIAGNOSIS'])] || 'No final diagnosis recorded';
+      document.getElementById('modal-doctor').textContent = row['DOCTOR'] || row[findKey(['DOCTOR', 'PHYSICIAN', 'ROD'])] || 'None assigned';
+      document.getElementById('modal-procedures').textContent = row['PROCEDURES DONE'] || row[findKey(['PROCEDURES DONE', 'PROCEDURE'])] || 'None';
+
+      // Timestamps
+      document.getElementById('modal-date-arrival').textContent = row['DATE OF ARRIVAL'] || '--';
+      document.getElementById('modal-time-arrival').textContent = row['TIME OF ARRIVAL'] || '--';
+      document.getElementById('modal-time-seen-er').textContent = row['TIME SEEN & ASSESTED BY ER'] || '--';
+      document.getElementById('modal-time-informed-rod').textContent = row['TIME INFORMED ROD'] || '--';
+      document.getElementById('modal-time-seen-rod').textContent = row['TIME PATIENT IS SEEN BY ROD'] || '--';
+      document.getElementById('modal-date-discharge').textContent = row['DATE OF DISCHARGE'] || '--';
+      document.getElementById('modal-time-discharge').textContent = row['TIME DISCHARGE'] || '--';
+      document.getElementById('modal-time-discharge-nurse').textContent = row['TIME DISCHARGE BY NURSE'] || '--';
+
+      // Time Lapses
+      document.getElementById('modal-lapse-nod').textContent = row['TIME LAPSED (NOD ASSESSMENT)'] || '--';
+      document.getElementById('modal-lapse-rod').textContent = row['TIME LAPSE (ROD)'] || '--';
+      document.getElementById('modal-lapse-total-nod').textContent = row['TOTAL NOD TIME LAPSE'] || '--';
+      document.getElementById('modal-lapse-arrival-discharge').textContent = row['TIME LAPSED (ARRIVAL TO DISCHARGED)'] || '--';
+
+      // Demographics
+      document.getElementById('modal-last-name').textContent = row['LAST NAME'] || '--';
+      document.getElementById('modal-first-name').textContent = row['FIRST NAME'] || '--';
+      document.getElementById('modal-mi').textContent = row['M.I.'] || '--';
+      document.getElementById('modal-birthday').textContent = row['BIRTHDAY'] || '--';
+      document.getElementById('modal-address').textContent = row['ADDRESS'] || '--';
+
+      // Disposition & Misc
+      document.getElementById('modal-disposition').textContent = row['DISPOSITION'] || '--';
+      document.getElementById('modal-condition').textContent = row['CONDITION ON DISCHARGE'] || 'STABLE';
+      document.getElementById('modal-refused-reason').textContent = row['REFUSED ADMISSION REASON'] || 'N/A';
+      document.getElementById('modal-medico-legal').textContent = row['MEDICO LEGAL'] || 'NO';
+      document.getElementById('modal-minor-or').textContent = row['MINOR OR'] || 'NO';
+      document.getElementById('modal-with-rx').textContent = row['WITH RX'] || 'NO';
+      document.getElementById('modal-charges').textContent = row['ER NURSING PROCEDURE CHARGES (MISCELLANEOUS)'] || '0.00';
+
+      // Full Raw JSON audit
+      const rawBox = document.getElementById('modal-raw-json-box');
+      rawBox.innerHTML = '';
+      detectedHeaders.forEach(k => {
+        const item = document.createElement('div');
+        item.className = "flex justify-between py-0.5 border-b border-slate-800";
+        item.innerHTML = `<span class="text-med-300 font-semibold">${escapeHtml(k)}:</span> <span class="text-slate-100 text-right font-mono-code">${escapeHtml(String(row[k] || ''))}</span>`;
+        rawBox.appendChild(item);
+      });
+
+      document.getElementById('patient-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeModal() {
+      document.getElementById('patient-modal').classList.add('hidden');
+      document.getElementById('modal-raw-json-box').classList.add('hidden');
+    }
+
+    function toggleRawModalData() {
+      const box = document.getElementById('modal-raw-json-box');
+      box.classList.toggle('hidden');
+    }
+
+    function getInitials(name) {
+      if (!name) return 'ER';
+      const clean = name.replace(/,/g, '').trim();
+      const parts = clean.split(' ').filter(Boolean);
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+      }
+      return clean.slice(0, 2).toUpperCase();
+    }
+
+    // Export engine (Clean XLSX or CSV)
+    function exportData(format = 'xlsx') {
+      if (filteredRecords.length === 0) {
+        alert("No filtered records available to export.");
+        return;
+      }
+
+      // Build export objects matching visible columns
+      const exportList = filteredRecords.map(row => {
+        const obj = {};
+        visibleColumns.forEach(col => {
+          obj[col] = row[col] || '';
+        });
+        return obj;
+      });
+
+      const ws = XLSX.utils.json_to_sheet(exportList);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Filtered_OPD_Logsheet");
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+
+      if (format === 'csv') {
+        XLSX.writeFile(wb, `ER_Logsheet_Filtered_${dateStr}.csv`, { bookType: 'csv' });
+      } else {
+        XLSX.writeFile(wb, `ER_Logsheet_Filtered_${dateStr}.xlsx`, { bookType: 'xlsx' });
+      }
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+
+</body>
+</html>
