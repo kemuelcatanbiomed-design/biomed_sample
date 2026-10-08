@@ -1,1 +1,0 @@
-# biomed_sample
